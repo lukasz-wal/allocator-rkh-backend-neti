@@ -1,32 +1,37 @@
 import { AggregateRoot, ApplicationError, IEventStore, IRepository } from '@filecoin-plus/core'
 import { StatusCodes } from 'http-status-codes'
 
+import { ApplicationPullRequestFile } from '@src/application/services/pull-request.types'
 import {
-  GovernanceReviewStarted,
-  KYCStarted,
-  KYCApproved,
-  KYCRejected,
-  GovernanceReviewApproved,
-  GovernanceReviewRejected,
-  RKHApprovalStarted,
-  DatacapAllocationUpdated,
-  RKHApprovalsUpdated,
-  RKHApprovalCompleted,
-  MetaAllocatorApprovalStarted,
-  MetaAllocatorApprovalCompleted,
+  GovernanceReviewApprovedData,
+  GovernanceReviewRejectedData,
+  KYCApprovedData,
+  KYCRejectedData,
+} from '@src/domain/types'
+import {
+  AllocatorMultisigUpdated,
   ApplicationCreated,
   ApplicationEdited,
   ApplicationPullRequestUpdated,
-  AllocatorMultisigUpdated,
+  DatacapAllocationUpdated,
   DatacapRefreshRequested,
-  KYCRevoked
+  GovernanceReviewApproved,
+  GovernanceReviewRejected,
+  GovernanceReviewStarted,
+  KYCApproved,
+  KYCRejected,
+  KYCRevoked,
+  KYCStarted,
+  MetaAllocatorApprovalCompleted,
+  MetaAllocatorApprovalStarted,
+  RKHApprovalCompleted,
+  RKHApprovalStarted,
+  RKHApprovalsUpdated,
 } from './application.events'
-import { KYCApprovedData, KYCRejectedData, GovernanceReviewApprovedData, GovernanceReviewRejectedData } from '@src/domain/types'
-import { ApplicationPullRequestFile } from '@src/application/services/pull-request.types'
 
-export interface IDatacapAllocatorRepository extends IRepository<DatacapAllocator> { }
+export interface IDatacapAllocatorRepository extends IRepository<DatacapAllocator> {}
 
-export interface IDatacapAllocatorEventStore extends IEventStore<DatacapAllocator> { }
+export interface IDatacapAllocatorEventStore extends IEventStore<DatacapAllocator> {}
 
 export enum ApplicationStatus {
   KYC_PHASE = 'KYC_PHASE',
@@ -66,6 +71,7 @@ export type ApplicationInstruction = {
   datacap_amount: number
   timestamp?: number
   status?: string
+  isMDMAAllocator?: boolean
 }
 
 export enum ApplicationInstructionStatus {
@@ -80,7 +86,7 @@ export type ApplicationGrantCycle = {
   pullRequest: ApplicationPullRequest
   instruction: ApplicationInstruction
 }
-export type StatusEvent = { stage: string; timestamp: number };
+export type StatusEvent = { stage: string; timestamp: number }
 
 export class DatacapAllocator extends AggregateRoot {
   public applicationNumber: number
@@ -132,11 +138,11 @@ export class DatacapAllocator extends AggregateRoot {
   public onChainAddressForDataCapAllocation: string
 
   public status: { [key: string]: number | null } = {
-    "Application Submitted": null,
-    "KYC Submitted": null,
-    "Approved": null,
-    "Declined": null,
-    "DC Allocated": null
+    'Application Submitted': null,
+    'KYC Submitted': null,
+    Approved: null,
+    Declined: null,
+    'DC Allocated': null,
   }
 
   /*public status: { [stage: string]: number[]|null} = {
@@ -200,14 +206,9 @@ export class DatacapAllocator extends AggregateRoot {
   }
 
   edit(file: ApplicationPullRequestFile) {
-    this.ensureValidApplicationStatus([
-      ApplicationStatus.KYC_PHASE,
-      ApplicationStatus.GOVERNANCE_REVIEW_PHASE,
-    ])   
+    this.ensureValidApplicationStatus([ApplicationStatus.KYC_PHASE, ApplicationStatus.GOVERNANCE_REVIEW_PHASE])
     console.log('edit')
-    this.applyChange(
-      new ApplicationEdited(this.guid, file),
-    )
+    this.applyChange(new ApplicationEdited(this.guid, file))
   }
 
   setAllocatorMultisig(
@@ -221,7 +222,6 @@ export class DatacapAllocator extends AggregateRoot {
     this.applyChange(
       new AllocatorMultisigUpdated(this.guid, allocatorActorId, multisigAddress, multisigThreshold, multisigSigners),
     )
-   
   }
 
   setApplicationPullRequest(
@@ -233,22 +233,26 @@ export class DatacapAllocator extends AggregateRoot {
     console.log('setApplicationPullRequest', this.applicationStatus)
     if (!refresh) {
       this.ensureValidApplicationStatus([ApplicationStatus.KYC_PHASE])
-      this.applyChange(new ApplicationPullRequestUpdated(
-        this.guid,
-        pullRequestNumber,
-        pullRequestUrl,
-        commentId,
-        ApplicationStatus.KYC_PHASE,
-      ))
+      this.applyChange(
+        new ApplicationPullRequestUpdated(
+          this.guid,
+          pullRequestNumber,
+          pullRequestUrl,
+          commentId,
+          ApplicationStatus.KYC_PHASE,
+        ),
+      )
     } else {
       this.ensureValidApplicationStatus([ApplicationStatus.APPROVED])
-      this.applyChange(new ApplicationPullRequestUpdated(
-        this.guid,
-        pullRequestNumber,
-        pullRequestUrl,
-        commentId,
-        ApplicationStatus.GOVERNANCE_REVIEW_PHASE,
-      ))
+      this.applyChange(
+        new ApplicationPullRequestUpdated(
+          this.guid,
+          pullRequestNumber,
+          pullRequestUrl,
+          commentId,
+          ApplicationStatus.GOVERNANCE_REVIEW_PHASE,
+        ),
+      )
     }
   }
 
@@ -286,30 +290,42 @@ export class DatacapAllocator extends AggregateRoot {
           the tooling field should get "smart_contract_allocator" entry
           the application should advance to MA approval
     */
-    const approvedMethod = details?.allocatorType === 'Manual' ? ApplicationAllocator.META_ALLOCATOR : ApplicationAllocator.RKH_ALLOCATOR
+    const approvedMethod =
+      details?.allocatorType === 'Manual' ? ApplicationAllocator.META_ALLOCATOR : ApplicationAllocator.RKH_ALLOCATOR
     const lastInstructionIndex = this.applicationInstructions.length - 1
     this.applicationInstructions[lastInstructionIndex].method = approvedMethod
     this.applicationInstructions[lastInstructionIndex].datacap_amount = details?.finalDataCap
     this.applicationInstructions[lastInstructionIndex].status = ApplicationInstructionStatus.PENDING
+    this.applicationInstructions[lastInstructionIndex].isMDMAAllocator = details?.isMDMAAllocator
+
     //this.applicationInstructions[lastInstructionIndex].timestamp = Math.floor(Date.now() / 1000)
 
     this.applyChange(new GovernanceReviewApproved(this.guid, this.applicationInstructions))
-    if (this.applicationInstructions[lastInstructionIndex].method === ApplicationAllocator.META_ALLOCATOR) {
-      this.applyChange(new MetaAllocatorApprovalStarted(this.guid))
-    } else {
-      this.applyChange(new RKHApprovalStarted(this.guid, 2)) // TODO: Hardcoded 2 for multisig threshold
+
+    const isMetaAllocator =
+      this.applicationInstructions[lastInstructionIndex].method === ApplicationAllocator.META_ALLOCATOR
+    const isMDMA = details?.isMDMAAllocator
+
+    const action = () => {
+      if (isMetaAllocator && isMDMA)
+        return new MetaAllocatorApprovalCompleted(this.guid, 0, '', this.applicationInstructions)
+      if (isMetaAllocator && !isMDMA) return new MetaAllocatorApprovalStarted(this.guid)
+      if (!isMetaAllocator && isMDMA) return new RKHApprovalCompleted(this.guid, this.applicationInstructions)
+      return new RKHApprovalStarted(this.guid, 2) // TODO: Hardcoded 2 for multisig threshold
     }
+
+    this.applyChange(action())
   }
 
-rejectGovernanceReview(details: GovernanceReviewRejectedData) {
-  this.ensureValidApplicationStatus([ApplicationStatus.GOVERNANCE_REVIEW_PHASE])
+  rejectGovernanceReview(details: GovernanceReviewRejectedData) {
+    this.ensureValidApplicationStatus([ApplicationStatus.GOVERNANCE_REVIEW_PHASE])
 
-  const lastInstructionIndex = this.applicationInstructions.length - 1
-  this.applicationInstructions[lastInstructionIndex].status = ApplicationInstructionStatus.DENIED
-  this.applyChange(new GovernanceReviewRejected(this.guid, this.applicationInstructions))
-}
+    const lastInstructionIndex = this.applicationInstructions.length - 1
+    this.applicationInstructions[lastInstructionIndex].status = ApplicationInstructionStatus.DENIED
+    this.applyChange(new GovernanceReviewRejected(this.guid, this.applicationInstructions))
+  }
 
-/*
+  /*
   approveGovernanceReview(details: GovernanceReviewApprovedData) {
     this.ensureValidApplicationStatus([ApplicationStatus.GOVERNANCE_REVIEW_PHASE])    
     this.ensureValidApplicationInstructions([
@@ -351,10 +367,7 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
 
   completeMetaAllocatorApproval(blockNumber: number, txHash: string) {
     console.log('completeMetaAllocatorApproval...')
-    this.ensureValidApplicationInstructions([
-      ApplicationAllocator.META_ALLOCATOR,
-      ApplicationAllocator.RKH_ALLOCATOR,
-    ])
+    this.ensureValidApplicationInstructions([ApplicationAllocator.META_ALLOCATOR, ApplicationAllocator.RKH_ALLOCATOR])
     const lastInstructionIndex = this.applicationInstructions.length - 1
     this.applicationInstructions[lastInstructionIndex].status = ApplicationInstructionStatus.GRANTED
     this.applyChange(new MetaAllocatorApprovalCompleted(this.guid, blockNumber, txHash, this.applicationInstructions))
@@ -362,10 +375,7 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
 
   completeRKHApproval() {
     this.ensureValidApplicationStatus([ApplicationStatus.RKH_APPROVAL_PHASE])
-    this.ensureValidApplicationInstructions([
-      ApplicationAllocator.META_ALLOCATOR,
-      ApplicationAllocator.RKH_ALLOCATOR,
-    ])
+    this.ensureValidApplicationInstructions([ApplicationAllocator.META_ALLOCATOR, ApplicationAllocator.RKH_ALLOCATOR])
     const lastInstructionIndex = this.applicationInstructions.length - 1
     this.applicationInstructions[lastInstructionIndex].status = ApplicationInstructionStatus.GRANTED
     this.applyChange(new RKHApprovalCompleted(this.guid, this.applicationInstructions))
@@ -375,7 +385,7 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
     console.log('updateDatacapAllocation')
     try {
       this.completeRKHApproval()
-    } catch (error) { }
+    } catch (error) {}
     // TODO: this.applyChange(new DatacapAllocationUpdated(this.guid, datacap));
   }
 
@@ -389,7 +399,6 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
     const refreshMethod = prevInstruction.method
 
     this.applyChange(new DatacapRefreshRequested(this.guid, refreshAmount, refreshMethod))
-
   }
 
   applyApplicationCreated(event: ApplicationCreated) {
@@ -412,8 +421,8 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
     this.allocationDatacapAllocationLimits = event.datacapAllocationLimits
     this.onChainAddressForDataCapAllocation = event.onChainAddressForDataCapAllocation
 
-    if(!this.applicationStatus){
-      this.applicationStatus = ApplicationStatus.KYC_PHASE;
+    if (!this.applicationStatus) {
+      this.applicationStatus = ApplicationStatus.KYC_PHASE
     }
 
     this.applicationInstructions = [
@@ -434,39 +443,44 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
 
     this.applicantOrgName = event.file.organization || this.applicantOrgName
 
-    if(this.applicationStatus === ApplicationStatus.META_APPROVAL_PHASE){
-      this.allocationTooling = ["smart_contract_allocator"]
+    if (this.applicationStatus === ApplicationStatus.META_APPROVAL_PHASE) {
+      this.allocationTooling = ['smart_contract_allocator']
       this.pathway = 'MA'
       this.ma_address = '0xB6F5d279AEad97dFA45209F3E53969c2EF43C21d'
     }
-    if(this.applicationStatus === ApplicationStatus.RKH_APPROVAL_PHASE){
-      this.allocationTooling = [],
-      this.pathway = 'RKH',
-      this.ma_address = 'f080'
+    if (this.applicationStatus === ApplicationStatus.RKH_APPROVAL_PHASE) {
+      ;(this.allocationTooling = []), (this.pathway = 'RKH'), (this.ma_address = 'f080')
     }
     this.applicantOrgAddresses = event.file.associated_org_addresses || this.applicantOrgAddresses
-    this.allocationStandardizedAllocations = event.file.application.allocations || this.allocationStandardizedAllocations
-    this.allocationAudit = event.file.application.audit && event.file.application.audit.length > 0
-      ? event.file.application.audit[0]
-      : this.allocationAudit
-    this.allocationDistributionRequired = event.file.application.distribution && event.file.application.distribution.length > 0
-      ? event.file.application.distribution[0]
-      : this.allocationDistributionRequired
+    this.allocationStandardizedAllocations =
+      event.file.application.allocations || this.allocationStandardizedAllocations
+    this.allocationAudit =
+      event.file.application.audit && event.file.application.audit.length > 0
+        ? event.file.application.audit[0]
+        : this.allocationAudit
+    this.allocationDistributionRequired =
+      event.file.application.distribution && event.file.application.distribution.length > 0
+        ? event.file.application.distribution[0]
+        : this.allocationDistributionRequired
     this.allocationTrancheSchedule = event.file.application.tranche_schedule || this.allocationTrancheSchedule
     this.allocationRequiredReplicas = event.file.application.required_replicas || this.allocationRequiredReplicas
-    this.allocationRequiredStorageProviders = event.file.application.required_sps || this.allocationRequiredStorageProviders
+    this.allocationRequiredStorageProviders =
+      event.file.application.required_sps || this.allocationRequiredStorageProviders
     this.allocationMaxDcClient = event.file.application.max_DC_client || this.allocationMaxDcClient
-    this.applicantGithubHandle = event.file.application.github_handles && event.file.application.github_handles.length > 0
-      ? event.file.application.github_handles[0]
-      : this.applicantGithubHandle
+    this.applicantGithubHandle =
+      event.file.application.github_handles && event.file.application.github_handles.length > 0
+        ? event.file.application.github_handles[0]
+        : this.applicantGithubHandle
     this.allocationBookkeepingRepo = event.file.application.allocation_bookkeeping || this.allocationBookkeepingRepo
-    this.onChainAddressForDataCapAllocation = event.file.application.client_contract_address || this.onChainAddressForDataCapAllocation
-    
+    this.onChainAddressForDataCapAllocation =
+      event.file.application.client_contract_address || this.onChainAddressForDataCapAllocation
+
     this.allocatorMultisigAddress = event.file.pathway_addresses?.msig || this.allocatorMultisigAddress
     this.allocatorMultisigSigners = event.file.pathway_addresses?.signers || this.allocatorMultisigSigners
 
     this.applicationInstructions = Object.entries(event.file.audit_outcomes).map(([_, value]) => ({
-      method: event.file.metapathway_type === "MA" ? ApplicationAllocator.META_ALLOCATOR : ApplicationAllocator.RKH_ALLOCATOR,
+      method:
+        event.file.metapathway_type === 'MA' ? ApplicationAllocator.META_ALLOCATOR : ApplicationAllocator.RKH_ALLOCATOR,
       datacap_amount: parseInt(value[1]),
       timestamp: parseInt(value[0]),
     }))
@@ -483,17 +497,16 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
 
   applyApplicationPullRequestUpdated(event: ApplicationPullRequestUpdated) {
     console.log('applyApplicationPullRequestUpdated')
-    
+
     this.applicationPullRequest = {
       prNumber: event.prNumber,
       prUrl: event.prUrl,
       commentId: event.commentId,
       timestamp: event.timestamp,
     }
-    if (this.status["Application Submitted"]===null) {
-      this.status["Application Submitted"]=event.timestamp.getTime()
+    if (this.status['Application Submitted'] === null) {
+      this.status['Application Submitted'] = event.timestamp.getTime()
     }
-
   }
 
   applyKYCStarted(_: KYCStarted) {
@@ -503,50 +516,48 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
 
   applyKYCApproved(event: KYCApproved) {
     console.log(' applyKYCApproved')
-    if (this.applicationStatus===ApplicationStatus.KYC_PHASE) {
-      this.status["KYC Submitted"] ??= event.timestamp.getTime()
+    if (this.applicationStatus === ApplicationStatus.KYC_PHASE) {
+      this.status['KYC Submitted'] ??= event.timestamp.getTime()
       this.applicationStatus = ApplicationStatus.GOVERNANCE_REVIEW_PHASE
     }
   }
-//check that it should be KYCApproved. 
+  //check that it should be KYCApproved.
   applyKYCRevoked(_: KYCApproved) {
     this.applicationStatus = ApplicationStatus.GOVERNANCE_REVIEW_PHASE
-    this.status["KYC Submitted"] = null
+    this.status['KYC Submitted'] = null
   }
 
   applyKYCRejected(event: KYCRejected) {
-    this.status["KYC Failed"] = event.timestamp.getTime()
+    this.status['KYC Failed'] = event.timestamp.getTime()
   }
 
   applyGovernanceReviewStarted(event: GovernanceReviewStarted) {
     console.log('applyGovernanceReviewStarted')
     if (this.applicationStatus === ApplicationStatus.IN_REFRESH) {
-      this.status["In Refresh"] ??= event.timestamp.getTime()
+      this.status['In Refresh'] ??= event.timestamp.getTime()
       this.applicationStatus = ApplicationStatus.GOVERNANCE_REVIEW_PHASE
     }
   }
 
   applyGovernanceReviewApproved(event: GovernanceReviewApproved) {
     console.log('applyGovernanceReviewApproved')
-     if (this.applicationStatus === ApplicationStatus.GOVERNANCE_REVIEW_PHASE) {
-      this.status["Approved"] ??= event.timestamp.getTime()
+    if (this.applicationStatus === ApplicationStatus.GOVERNANCE_REVIEW_PHASE) {
+      this.status['Approved'] ??= event.timestamp.getTime()
     }
     //this.applicationStatus = ApplicationStatus.APPROVED
   }
 
   applyGovernanceReviewRejected(event: GovernanceReviewRejected) {
     this.applicationStatus = ApplicationStatus.REJECTED
-    if (!this.status["Declined"]) {
-      this.status["Declined"]=event.timestamp.getTime()
+    if (!this.status['Declined']) {
+      this.status['Declined'] = event.timestamp.getTime()
     }
   }
 
   applyRKHApprovalStarted(event: RKHApprovalStarted) {
     console.log('applyRKHApprovalStarted')
     this.applicationStatus = ApplicationStatus.RKH_APPROVAL_PHASE
-    this.allocationTooling = [],
-    this.pathway = 'RKH',
-    this.ma_address = 'f080'
+    ;(this.allocationTooling = []), (this.pathway = 'RKH'), (this.ma_address = 'f080')
     this.rkhApprovalThreshold = event.approvalThreshold
   }
 
@@ -562,8 +573,8 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
   }
 
   applyRKHApprovalCompleted(event: RKHApprovalCompleted) {
-    if(this.applicationStatus === ApplicationStatus.RKH_APPROVAL_PHASE){
-      this.status["DC Allocated"] ??= event.timestamp.getTime()
+    if (this.applicationStatus === ApplicationStatus.RKH_APPROVAL_PHASE) {
+      this.status['DC Allocated'] ??= event.timestamp.getTime()
     }
     this.applicationStatus = ApplicationStatus.DC_ALLOCATED
     const index = this.applicationInstructions.length - 1
@@ -574,14 +585,14 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
 
   applyMetaAllocatorApprovalStarted(event: MetaAllocatorApprovalStarted) {
     this.applicationStatus = ApplicationStatus.META_APPROVAL_PHASE
-    this.allocationTooling = ["smart_contract_allocator"]
+    this.allocationTooling = ['smart_contract_allocator']
     this.pathway = 'MA'
     this.ma_address = '0xB6F5d279AEad97dFA45209F3E53969c2EF43C21d'
   }
 
   applyMetaAllocatorApprovalCompleted(event: MetaAllocatorApprovalCompleted) {
-    if(this.applicationStatus === ApplicationStatus.META_APPROVAL_PHASE){
-      this.status["DC Allocated"] ??= event.timestamp.getTime()
+    if (this.applicationStatus === ApplicationStatus.META_APPROVAL_PHASE) {
+      this.status['DC Allocated'] ??= event.timestamp.getTime()
     }
     this.applicationStatus = ApplicationStatus.DC_ALLOCATED
 
@@ -589,7 +600,6 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
     this.applicationInstructions[index].timestamp = event.timestamp.getTime()
     this.applicationInstructions[index].status = ApplicationInstructionStatus.GRANTED
     this.applicationInstructions[index].datacap_amount = event.applicationInstructions[index].datacap_amount
-
   }
 
   applyDatacapAllocationUpdated(event: DatacapAllocationUpdated) {
@@ -600,7 +610,7 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
   applyDatacapRefreshRequested(event: DatacapRefreshRequested) {
     console.log('applyDatacapRefreshRequested', this.applicationStatus)
     if (this.applicationStatus === ApplicationStatus.DC_ALLOCATED) {
-      this.status["In Refresh"] ??= event.timestamp.getTime()
+      this.status['In Refresh'] ??= event.timestamp.getTime()
     }
     this.applicationStatus = ApplicationStatus.GOVERNANCE_REVIEW_PHASE
     this.applicationInstructions.push({
@@ -627,12 +637,11 @@ rejectGovernanceReview(details: GovernanceReviewRejectedData) {
     errorCode: string = '5308',
     errorMessage: string = 'Invalid operation for the current phase',
   ): void {
-
     if (this.applicationInstructions.length === 0) {
       throw new ApplicationError(StatusCodes.BAD_REQUEST, errorCode, 'Empty instruction data')
     }
 
-    const lastInstruction = this.applicationInstructions[this.applicationInstructions.length - 1];
+    const lastInstruction = this.applicationInstructions[this.applicationInstructions.length - 1]
     let instructionMethod: string
     let instructionAmount: number
     try {
