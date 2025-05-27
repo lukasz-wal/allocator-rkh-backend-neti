@@ -116,7 +116,7 @@ async function fetchReviews(client: IGithubClient, logger: Logger, application: 
 function findApprovedReview(reviews: any[], logger: Logger, applicationId: string): any | undefined {
   const approvedReview = reviews.find(
     (review) =>
-      review.state === 'DC_ALLOCATED' && config.GOVERNANCE_TEAM_GITHUB_HANDLES.includes(review?.user?.login as string),
+      review.state === 'APPROVED' && config.GOVERNANCE_TEAM_GITHUB_HANDLES.includes(review?.user?.login as string),
   )
 
   if (approvedReview) {
