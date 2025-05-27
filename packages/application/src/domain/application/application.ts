@@ -154,17 +154,7 @@ export class DatacapAllocator extends AggregateRoot {
     Declined: null,
     'DC Allocated': null,
   }
-  
-  /*public status: { [stage: string]: number[]|null} = {
-    "Application Submitted": null,
-    "KYC Submitted":         null,
-    "KYC Failed":            null, 
-    "In Review":             null,
-    "In Refresh":            null,
-    "Approved":              null,
-    "Declined":              null,
-    "DC Allocated":          null,
-  }*/
+ 
   constructor(guid?: string) {
     super(guid)
   }
@@ -321,6 +311,7 @@ export class DatacapAllocator extends AggregateRoot {
         this.pathway = 'MDMA'
         this.ma_address = this.mdma_address
         this.applicationStatus = ApplicationStatus.DC_ALLOCATED
+        this.applicationInstructions[lastInstructionIndex].status = ApplicationInstructionStatus.GRANTED
         console.log('apply gov review MDMA', this)
         return new MetaAllocatorApprovalCompleted(this.guid, 0, '', this.applicationInstructions)
       }
@@ -330,7 +321,8 @@ export class DatacapAllocator extends AggregateRoot {
         this.pathway = 'RKH'
         this.ma_address = this.rkh_address
         this.applicationStatus = ApplicationStatus.DC_ALLOCATED
-         console.log('apply gov review RKH', this)
+        this.applicationInstructions[lastInstructionIndex].status = ApplicationInstructionStatus.GRANTED
+        console.log('apply gov review RKH', this)
         return new RKHApprovalCompleted(this.guid, this.applicationInstructions)
       }
       return new RKHApprovalStarted(this.guid, 2) // TODO: Hardcoded 2 for multisig threshold
@@ -435,12 +427,6 @@ export class DatacapAllocator extends AggregateRoot {
     this.applicantOrgName = event.applicantOrgName
     this.applicantOrgAddresses = event.applicantOrgAddresses
     this.applicantGithubHandle = event.applicantGithubHandle
-    
-    this.allocationTooling = this.allocationTooling
-    this.pathway = this.pathway
-    this.ma_address = this.ma_address
-    this.mdma_address = this.mdma_address
-    this.isMDMA = this.isMDMA
 
     this.allocationTrancheSchedule = event.allocationTrancheSchedule
     this.allocationAudit = event.audit
@@ -482,11 +468,7 @@ export class DatacapAllocator extends AggregateRoot {
       this.pathway = 'RKH'
       this.ma_address = this.rkh_address
     }
-    this.allocationTooling = this.allocationTooling
-    this.pathway = this.pathway
-    this.ma_address = this.ma_address
-    this.mdma_address = this.mdma_address
-    this.isMDMA = this.isMDMA
+
     this.applicantOrgAddresses = event.file.associated_org_addresses || this.applicantOrgAddresses
     this.allocationStandardizedAllocations =
       event.file.application.allocations || this.allocationStandardizedAllocations
