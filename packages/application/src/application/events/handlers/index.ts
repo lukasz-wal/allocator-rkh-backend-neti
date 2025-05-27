@@ -1,35 +1,37 @@
 import { IEventHandler } from '@filecoin-plus/core'
+import { getMultisigInfo } from '@src/infrastructure/clients/filfox'
 import { inject, injectable } from 'inversify'
 import { Db } from 'mongodb'
-import { getMultisigInfo } from '@src/infrastructure/clients/filfox'
 
+import {
+  ApplicationAllocator,
+  ApplicationInstructionStatus,
+  ApplicationStatus,
+} from '@src/domain/application/application'
 import {
   AllocatorMultisigUpdated,
   ApplicationEdited,
   ApplicationPullRequestUpdated,
   DatacapAllocationUpdated,
+  DatacapRefreshRequested,
   GovernanceReviewApproved,
   GovernanceReviewRejected,
   GovernanceReviewStarted,
   KYCApproved,
   KYCRejected,
+  KYCRevoked,
   KYCStarted,
+  MetaAllocatorApplyApprovalCompleted,
+  MetaAllocatorApprovalCompleted,
+  MetaAllocatorApprovalStarted,
+  RKHApplyApprovalCompleted,
   RKHApprovalCompleted,
   RKHApprovalStarted,
   RKHApprovalsUpdated,
-  MetaAllocatorApprovalStarted,
-  MetaAllocatorApprovalCompleted,
-  DatacapRefreshRequested,
-  KYCRevoked,
 } from '@src/domain/application/application.events'
-import { TYPES } from '@src/types'
 import { IApplicationDetailsRepository } from '@src/infrastructure/respositories/application-details.repository'
-import {
-  ApplicationStatus,
-  ApplicationAllocator,
-  ApplicationInstructionStatus,
-} from '@src/domain/application/application'
 import { ApplicationDetails } from '@src/infrastructure/respositories/application-details.types'
+import { TYPES } from '@src/types'
 
 @injectable()
 export class ApplicationEditedEventHandler implements IEventHandler<ApplicationEdited> {
@@ -274,6 +276,28 @@ export class MetaAllocatorApprovalStartedEventHandler implements IEventHandler<M
 }
 
 @injectable()
+export class MetaAllocatorApplyApprovalCompletedEventHandler
+  implements IEventHandler<MetaAllocatorApplyApprovalCompleted>
+{
+  public event = MetaAllocatorApplyApprovalCompleted.name
+
+  constructor(@inject(TYPES.Db) private readonly _db: Db) {}
+
+  async handle(event: MetaAllocatorApplyApprovalCompleted) {
+    console.log('MetaAllocatorApprovalCompletedEventHandler', event)
+    await this._db.collection('applicationDetails').updateOne(
+      { id: event.aggregateId },
+      {
+        $set: {
+          status: ApplicationStatus.DC_ALLOCATED,
+          applicationInstructions: event.applicationInstructions,
+        },
+      },
+    )
+  }
+}
+
+@injectable()
 export class MetaAllocatorApprovalCompletedEventHandler implements IEventHandler<MetaAllocatorApprovalCompleted> {
   public event = MetaAllocatorApprovalCompleted.name
 
@@ -355,6 +379,26 @@ export class RKHApprovalCompletedEventHandler implements IEventHandler<RKHApprov
       {
         $set: {
           status: ApplicationStatus.APPROVED,
+          applicationInstructions: event.applicationInstructions,
+        },
+      },
+    )
+  }
+}
+
+@injectable()
+export class RKHApplyApprovalCompletedEventHandler implements IEventHandler<RKHApplyApprovalCompleted> {
+  public event = RKHApplyApprovalCompleted.name
+
+  constructor(@inject(TYPES.Db) private readonly _db: Db) {}
+
+  async handle(event: RKHApplyApprovalCompleted) {
+    // Update allocator status in the database
+    await this._db.collection('applicationDetails').updateOne(
+      { id: event.aggregateId },
+      {
+        $set: {
+          status: ApplicationStatus.DC_ALLOCATED,
           applicationInstructions: event.applicationInstructions,
         },
       },

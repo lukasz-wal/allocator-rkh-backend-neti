@@ -11,61 +11,65 @@ import {
 } from '@filecoin-plus/core'
 import { Container } from 'inversify'
 
-import { infrastructureModule } from '@src/infrastructure/module'
+import { RevokeKYCCommandHandler } from '@src/application/use-cases/revoke-kyc/revoke-kyc.command'
 import {
   AllocatorMultisigUpdated,
   ApplicationCreated,
   ApplicationEdited,
   ApplicationPullRequestUpdated,
   DatacapAllocationUpdated,
+  DatacapRefreshRequested,
   GovernanceReviewApproved,
   GovernanceReviewRejected,
   GovernanceReviewStarted,
   KYCApproved,
   KYCRejected,
+  KYCRevoked,
   KYCStarted,
+  MetaAllocatorApplyApprovalCompleted,
+  MetaAllocatorApprovalCompleted,
+  MetaAllocatorApprovalStarted,
+  RKHApplyApprovalCompleted,
   RKHApprovalCompleted,
   RKHApprovalStarted,
   RKHApprovalsUpdated,
-  MetaAllocatorApprovalStarted,
-  MetaAllocatorApprovalCompleted,
-  DatacapRefreshRequested,
-  KYCRevoked
 } from '@src/domain/application/application.events'
+import { infrastructureModule } from '@src/infrastructure/module'
 import { TYPES } from '@src/types'
 import {
   AllocatorMultisigUpdatedEventHandler,
   ApplicationEditedEventHandler,
   ApplicationPullRequestUpdatedEventHandler,
   DatacapAllocationUpdatedEventHandler,
+  DatacapRefreshRequestedEventHandler,
   GovernanceReviewApprovedEventHandler,
   GovernanceReviewRejectedEventHandler,
   GovernanceReviewStartedEventHandler,
   KYCApprovedEventHandler,
   KYCRejectedEventHandler,
+  KYCRevokedEventHandler,
   KYCStartedEventHandler,
+  MetaAllocatorApplyApprovalCompletedEventHandler,
+  MetaAllocatorApprovalCompletedEventHandler,
+  MetaAllocatorApprovalStartedEventHandler,
+  RKHApplyApprovalCompletedEventHandler,
   RKHApprovalCompletedEventHandler,
   RKHApprovalStartedEventHandler,
   RKHApprovalsUpdatedEventHandler,
-  MetaAllocatorApprovalStartedEventHandler,
-  MetaAllocatorApprovalCompletedEventHandler,
-  DatacapRefreshRequestedEventHandler, KYCRevokedEventHandler
 } from './application/events/handlers'
-import { UpdateRKHApprovalsCommandHandler } from './application/use-cases/update-rkh-approvals/update-rkh-approvals.command'
-import { SubmitGovernanceReviewResultCommandHandler } from './application/use-cases/submit-governance-review/submit-governance-review.command'
-import { ApplicationCreatedEventHandler } from './application/use-cases/create-application/application-created.event'
-import { CreateApplicationCommandHandler } from './application/use-cases/create-application/create-application.command'
+import { GetApplicationsQueryHandler } from './application/queries/get-applications/get-applications.query'
 import { MessageService } from './application/services/message.service'
 import { PullRequestService } from './application/services/pull-request.service'
-import { SubmitKYCResultCommandHandler } from './application/use-cases/submit-kyc-result/submit-kyc-result.command'
-import { GetApplicationsQueryHandler } from './application/queries/get-applications/get-applications.query'
+import { RoleService } from './application/services/role.service'
+import { ApplicationCreatedEventHandler } from './application/use-cases/create-application/application-created.event'
+import { CreateApplicationCommandHandler } from './application/use-cases/create-application/create-application.command'
+import { CreateRefreshApplicationCommandHandler } from './application/use-cases/create-application/create-refresh-application.command'
 import { EditApplicationCommandHandler } from './application/use-cases/edit-application/edit-application.command'
+import { SubmitGovernanceReviewResultCommandHandler } from './application/use-cases/submit-governance-review/submit-governance-review.command'
+import { SubmitKYCResultCommandHandler } from './application/use-cases/submit-kyc-result/submit-kyc-result.command'
 import { UpdateDatacapAllocationCommandHandler } from './application/use-cases/update-datacap-allocation/update-datacap-allocation'
 import { UpdateMetaAllocatorApprovalsCommandHandler } from './application/use-cases/update-ma-approvals/update-ma-approvals.command'
-import { CreateRefreshApplicationCommandHandler } from './application/use-cases/create-application/create-refresh-application.command'
-import { RoleService } from './application/services/role.service'
-import { RevokeKYCCommandHandler } from '@src/application/use-cases/revoke-kyc/revoke-kyc.command'
-
+import { UpdateRKHApprovalsCommandHandler } from './application/use-cases/update-rkh-approvals/update-rkh-approvals.command'
 
 export const initialize = async (): Promise<Container> => {
   const container = new Container()
@@ -102,9 +106,16 @@ export const initialize = async (): Promise<Container> => {
   container.bind<IEventHandler<RKHApprovalsUpdated>>(TYPES.Event).to(RKHApprovalsUpdatedEventHandler)
   container.bind<IEventHandler<RKHApprovalCompleted>>(TYPES.Event).to(RKHApprovalCompletedEventHandler)
   container.bind<IEventHandler<DatacapAllocationUpdated>>(TYPES.Event).to(DatacapAllocationUpdatedEventHandler)
-  
+
   container.bind<IEventHandler<MetaAllocatorApprovalStarted>>(TYPES.Event).to(MetaAllocatorApprovalStartedEventHandler)
-  container.bind<IEventHandler<MetaAllocatorApprovalCompleted>>(TYPES.Event).to(MetaAllocatorApprovalCompletedEventHandler)
+  container
+    .bind<IEventHandler<MetaAllocatorApprovalCompleted>>(TYPES.Event)
+    .to(MetaAllocatorApprovalCompletedEventHandler)
+
+  container
+    .bind<IEventHandler<MetaAllocatorApplyApprovalCompleted>>(TYPES.Event)
+    .to(MetaAllocatorApplyApprovalCompletedEventHandler)
+  container.bind<IEventHandler<RKHApplyApprovalCompleted>>(TYPES.Event).to(RKHApplyApprovalCompletedEventHandler)
 
   container.bind<IEventHandler<DatacapRefreshRequested>>(TYPES.Event).to(DatacapRefreshRequestedEventHandler)
 

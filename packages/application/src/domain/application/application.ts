@@ -22,8 +22,10 @@ import {
   KYCRejected,
   KYCRevoked,
   KYCStarted,
+  MetaAllocatorApplyApprovalCompleted,
   MetaAllocatorApprovalCompleted,
   MetaAllocatorApprovalStarted,
+  RKHApplyApprovalCompleted,
   RKHApprovalCompleted,
   RKHApprovalStarted,
   RKHApprovalsUpdated,
@@ -296,7 +298,6 @@ export class DatacapAllocator extends AggregateRoot {
     this.applicationInstructions[lastInstructionIndex].method = approvedMethod
     this.applicationInstructions[lastInstructionIndex].datacap_amount = details?.finalDataCap
     this.applicationInstructions[lastInstructionIndex].status = ApplicationInstructionStatus.PENDING
-    this.applicationInstructions[lastInstructionIndex].isMDMAAllocator = details?.isMDMAAllocator
 
     //this.applicationInstructions[lastInstructionIndex].timestamp = Math.floor(Date.now() / 1000)
 
@@ -306,11 +307,15 @@ export class DatacapAllocator extends AggregateRoot {
       this.applicationInstructions[lastInstructionIndex].method === ApplicationAllocator.META_ALLOCATOR
     const isMDMA = details?.isMDMAAllocator
 
+    if (isMDMA) {
+      this.applicationInstructions[lastInstructionIndex].isMDMAAllocator = details?.isMDMAAllocator
+    }
+
     const action = () => {
       if (isMetaAllocator && isMDMA)
-        return new MetaAllocatorApprovalCompleted(this.guid, 0, '', this.applicationInstructions)
+        return new MetaAllocatorApplyApprovalCompleted(this.guid, this.applicationInstructions)
       if (isMetaAllocator && !isMDMA) return new MetaAllocatorApprovalStarted(this.guid)
-      if (!isMetaAllocator && isMDMA) return new RKHApprovalCompleted(this.guid, this.applicationInstructions)
+      if (!isMetaAllocator && isMDMA) return new RKHApplyApprovalCompleted(this.guid, this.applicationInstructions)
       return new RKHApprovalStarted(this.guid, 2) // TODO: Hardcoded 2 for multisig threshold
     }
 
@@ -373,7 +378,7 @@ export class DatacapAllocator extends AggregateRoot {
      * the UI. But this in-memory object is not very well maintained.
      * Specifically for the application instructions the in-memory object is not updated with the
      * latest status as the application progresses, so when we check it here it's still the default.
-     * 
+     *
      * HOWEVER, I believe it's not actually necessary to check this here, because the on-chain
      * messages and the PR are all correct already, so I'm disabling this check for now.
      * If all holds up then we can decide whether to simply remove this code or go ahead with
@@ -390,7 +395,7 @@ export class DatacapAllocator extends AggregateRoot {
   }
 
   completeRKHApproval() {
-    console.log("Completing RKH Approval for application", this)
+    console.log('Completing RKH Approval for application', this)
     this.ensureValidApplicationStatus([ApplicationStatus.RKH_APPROVAL_PHASE])
 
     /* Big hack warning (AKA "TODO")
@@ -399,7 +404,7 @@ export class DatacapAllocator extends AggregateRoot {
      * the UI. But this in-memory object is not very well maintained.
      * Specifically for the application instructions the in-memory object is not updated with the
      * latest status as the application progresses, so when we check it here it's still the default.
-     * 
+     *
      * HOWEVER, I believe it's not actually necessary to check this here, because the on-chain
      * messages and the PR are all correct already, so I'm disabling this check for now.
      * If all holds up then we can decide whether to simply remove this code or go ahead with
@@ -453,17 +458,17 @@ export class DatacapAllocator extends AggregateRoot {
     this.allocationTooling = []
     this.allocationDatacapAllocationLimits = event.datacapAllocationLimits
     this.onChainAddressForDataCapAllocation = event.onChainAddressForDataCapAllocation
-    if(!this.applicationStatus){
-      this.applicationStatus = ApplicationStatus.KYC_PHASE;
+    if (!this.applicationStatus) {
+      this.applicationStatus = ApplicationStatus.KYC_PHASE
 
       this.applicationInstructions = [
-      {
-        method: '',
-        datacap_amount: 5,
-        timestamp: event.timestamp.getTime(),
-        status: ApplicationInstructionStatus.PENDING,
-      },
-    ]
+        {
+          method: '',
+          datacap_amount: 5,
+          timestamp: event.timestamp.getTime(),
+          status: ApplicationInstructionStatus.PENDING,
+        },
+      ]
     }
     console.log(`Application Created Ended`, this)
   }
@@ -661,7 +666,9 @@ export class DatacapAllocator extends AggregateRoot {
     errorMessage: string = 'Invalid operation for the current phase',
   ): void {
     if (!expectedStatuses.includes(this.applicationStatus)) {
-      console.error(`Invalid application status: ${this.applicationStatus}. Expected one of: ${expectedStatuses.join(', ')}`)
+      console.error(
+        `Invalid application status: ${this.applicationStatus}. Expected one of: ${expectedStatuses.join(', ')}`,
+      )
       throw new ApplicationError(StatusCodes.BAD_REQUEST, errorCode, errorMessage)
     }
   }

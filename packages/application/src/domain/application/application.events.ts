@@ -1,7 +1,7 @@
 import { Event } from '@filecoin-plus/core'
+import { ApplicationPullRequestFile } from '@src/application/services/pull-request.types'
 import { KYCApprovedData, KYCRejectedData } from '@src/domain/types'
 import { ApplicationInstruction, ApplicationStatus } from './application'
-import { ApplicationPullRequestFile } from '@src/application/services/pull-request.types'
 
 export class ApplicationCreated extends Event {
   eventName = ApplicationCreated.name
@@ -118,9 +118,7 @@ export class KYCRevoked extends Event {
 
   public timestamp: Date
 
-  constructor(
-    allocatorId: string,
-  ) {
+  constructor(allocatorId: string) {
     super(allocatorId)
     this.timestamp = new Date()
   }
@@ -203,12 +201,10 @@ export class RKHApprovalStarted extends Event {
 export class MetaAllocatorApprovalStarted extends Event {
   eventName = MetaAllocatorApprovalStarted.name
   aggregateName = 'allocator'
-  
+
   public readonly timestamp: Date
 
-  constructor(
-    allocatorId: string,
-  ) {
+  constructor(allocatorId: string) {
     super(allocatorId)
     this.timestamp = new Date()
   }
@@ -231,6 +227,20 @@ export class MetaAllocatorApprovalCompleted extends Event {
   }
 }
 
+export class MetaAllocatorApplyApprovalCompleted extends Event {
+  eventName = MetaAllocatorApplyApprovalCompleted.name
+  aggregateName = 'allocator'
+
+  public readonly timestamp: Date
+
+  constructor(
+    allocatorId: string,
+    public applicationInstructions: ApplicationInstruction[],
+  ) {
+    super(allocatorId)
+    this.timestamp = new Date()
+  }
+}
 
 export class RKHApprovalsUpdated extends Event {
   eventName = RKHApprovalsUpdated.name
@@ -251,6 +261,21 @@ export class RKHApprovalsUpdated extends Event {
 
 export class RKHApprovalCompleted extends Event {
   eventName = RKHApprovalCompleted.name
+  aggregateName = 'allocator'
+
+  public readonly timestamp: Date
+
+  constructor(
+    allocatorId: string,
+    public applicationInstructions: ApplicationInstruction[],
+  ) {
+    super(allocatorId)
+    this.timestamp = new Date()
+  }
+}
+
+export class RKHApplyApprovalCompleted extends Event {
+  eventName = RKHApplyApprovalCompleted.name
   aggregateName = 'allocator'
 
   public readonly timestamp: Date
