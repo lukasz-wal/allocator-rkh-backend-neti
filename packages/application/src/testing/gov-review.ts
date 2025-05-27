@@ -35,6 +35,7 @@ async function main() {
 
     let applicationId = 'app-test-1731240427'
     const testEdit = false
+    // TODO this test has rotted, no longer reflects updates to structures
     const applicationInstructions = [
         {
             method: 'RKH_ALLOCATOR',

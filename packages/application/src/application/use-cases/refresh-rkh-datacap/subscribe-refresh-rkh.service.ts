@@ -80,6 +80,7 @@ export async function submitRefreshRKHAllocatorCommand(
     let lastInstruction: ApplicationInstruction
     let lastInstructionMethod: string
     let lastInstructionAmount: number
+    // FIXME This is where we need to find the latest one by date and/or status, not just length
     try {
         applicationInstructionsLength = applicationDetails.applicationInstructions.length
         lastInstruction = applicationDetails.applicationInstructions[applicationInstructionsLength - 1]

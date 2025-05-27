@@ -65,6 +65,7 @@ async function testSubmitRefreshRKHAllocatorCommand(
         allocationTrancheSchedule: 'type',
         datacap: 0,
         status: ApplicationStatus.APPROVED,
+        // TODO this test has rotted, no longer reflects updates to structures
         applicationInstructions: [
             {
                 datacap_amount: initialDatacap,

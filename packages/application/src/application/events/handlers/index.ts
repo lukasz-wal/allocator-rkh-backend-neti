@@ -1,5 +1,4 @@
-import { IEventHandler } from '@filecoin-plus/core'
-import { getMultisigInfo } from '@src/infrastructure/clients/filfox'
+import { IEventHandler, zuluToEpoch } from '@filecoin-plus/core'
 import { inject, injectable } from 'inversify'
 import { Db } from 'mongodb'
 
@@ -29,6 +28,7 @@ import {
   RKHApprovalStarted,
   RKHApprovalsUpdated,
 } from '@src/domain/application/application.events'
+import { getMultisigInfo } from '@src/infrastructure/clients/filfox'
 import { IApplicationDetailsRepository } from '@src/infrastructure/respositories/application-details.repository'
 import { ApplicationDetails } from '@src/infrastructure/respositories/application-details.types'
 import { TYPES } from '@src/types'
@@ -43,6 +43,17 @@ export class ApplicationEditedEventHandler implements IEventHandler<ApplicationE
   ) {}
 
   async handle(event: ApplicationEdited): Promise<void> {
+    // Convert human readable Zulu time to epoch for internal handling
+    const lifeCycle = event.file.audits.map((ao) => ({
+      method:
+        event.file.metapathway_type === 'MA' ? ApplicationAllocator.META_ALLOCATOR : ApplicationAllocator.RKH_ALLOCATOR,
+      startTimestamp: zuluToEpoch(ao.started),
+      endTimestamp: zuluToEpoch(ao.ended),
+      allocatedTimestamp: zuluToEpoch(ao.dc_allocated),
+      status: ao.outcome || 'PENDING',
+      datacap_amount: ao.datacap_amount || 0,
+    }))
+
     const updated = {
       id: event.aggregateId,
       number: event.file.application_number,
@@ -51,19 +62,13 @@ export class ApplicationEditedEventHandler implements IEventHandler<ApplicationE
       address: event.file.address,
       github: event.file.application.github_handles[0],
       // xDONE
-      applicationInstructions: Object.entries(event.file.audit_outcomes).map(([_, value]) => ({
-        method:
-          event.file.metapathway_type === 'MA'
-            ? ApplicationAllocator.META_ALLOCATOR
-            : ApplicationAllocator.RKH_ALLOCATOR,
-        timestamp: parseInt(value[0]),
-        datacap_amount: parseInt(value[1]),
-      })),
+      applicationInstructions: lifeCycle,
     } as Partial<ApplicationDetails>
 
-    if (Object.keys(event.file.audit_outcomes).length > 0) {
-      const key = `Audit ${Object.keys(event.file.audit_outcomes).length}`
-      updated.datacap = parseInt(event.file.audit_outcomes[key][1])
+    // FIXME here I think we need to find the most recent one based on dates, not just the length
+    if (event.file.audits.length > 0) {
+      const lastAudit = event.file.audits[event.file.audits.length - 1]
+      updated.datacap = lastAudit.datacap_amount || 0
     }
 
     await this._repository.update(updated)
@@ -249,6 +254,7 @@ export class GovernanceReviewRejectedEventHandler implements IEventHandler<Gover
       { id: event.aggregateId },
       {
         $set: {
+          // FIXME need to harmonise the status enum with the new strings
           status: ApplicationStatus.REJECTED,
           applicationInstructions: event.applicationInstructions,
         },

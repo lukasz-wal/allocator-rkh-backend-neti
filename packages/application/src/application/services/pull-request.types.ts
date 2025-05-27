@@ -1,7 +1,16 @@
 import { ApplicationInstruction, DatacapAllocator } from '@src/domain/application/application'
 import { ApplicationDetailsRepository } from '@src/infrastructure/respositories/application-details.repository'
 import config from '@src/config'
+import { epochToZulu, zuluToEpoch } from '@filecoin-plus/core'
 import { getMultisigInfo } from '@src/infrastructure/clients/filfox'
+
+type AuditCycle = { 
+  started: string,
+  ended: string,
+  dc_allocated: string,
+  outcome: string, //"PENDING" | "APPROVED" | "REJECTED" | "DOUBLE" | "THROTTLE" | "MATCH",
+  datacap_amount: number,
+}
 
 export type ApplicationPullRequestFile = {
   application_number: number
@@ -31,26 +40,33 @@ export type ApplicationPullRequestFile = {
     client_contract_address: string
   }
   history: {
-    [key: string]: number|null
+    [key: string]: string
   }
-  audit_outcomes: {
-    [key: string]: [string, string]
-  }
+  audits: AuditCycle[]
   old_allocator_id: string
 }
 
 
-
 export async function mapApplicationToPullRequestFile(application: DatacapAllocator): Promise<ApplicationPullRequestFile>{
-  const lifeCycle = (application.applicationInstructions || []).reduce(
-    (acc, instruction, index) => {
-      const timestamp = instruction.timestamp ? instruction.timestamp.toString() : ''
-      acc[`Audit ${index + 1}`] = [timestamp, instruction.datacap_amount.toString()]
-      return acc
-    },
-    {} as { [key: string]: [string, string] },
-  )
+  
+  console.log("application.applicationInstructions", application.applicationInstructions)
 
+  const lifeCycle: AuditCycle[] = application.applicationInstructions.map((ao) => ({
+    started: ao.startTimestamp ? epochToZulu(ao.startTimestamp) : "",
+    ended: ao.endTimestamp ? epochToZulu(ao.endTimestamp) : "",
+    dc_allocated: ao.allocatedTimestamp ? epochToZulu(ao.allocatedTimestamp) : "",
+    outcome: ao.status || "PENDING",
+    datacap_amount: ao.datacap_amount || 0
+  }))
+
+  //Convert timestamps to human readable zulu format
+  const hrHistory = {
+      "Application Submitted": application.status["Application Submitted"] ? epochToZulu(application.status["Application Submitted"]) : "",
+      "KYC Submitted": application.status["KYC Submitted"] ? epochToZulu(application.status["KYC Submitted"]) : "",
+      "Approved": application.status["Approved"] ? epochToZulu(application.status["Approved"]) : "",
+      "Declined": application.status["Declined"] ? epochToZulu(application.status["Declined"]) : "",
+      "DC Allocated": application.status["DC Allocated"] ? epochToZulu(application.status["DC Allocated"]) : "",
+  }
 
  //get current values of msig
   let allocatorAddress     = application.allocatorMultisigAddress ?? ""
@@ -119,8 +135,8 @@ export async function mapApplicationToPullRequestFile(application: DatacapAlloca
       allocation_bookkeeping: application.allocationBookkeepingRepo,
       client_contract_address: "",
     },
-    history: application.status,
-    audit_outcomes: lifeCycle,
+    history: hrHistory,
+    audits: lifeCycle,
     old_allocator_id: "",
   }
 }

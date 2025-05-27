@@ -5,6 +5,7 @@ import { ApplicationAllocator } from '@src/domain/application/application'
 import { ApplicationInstruction, IDatacapAllocatorRepository } from '@src/domain/application/application'
 import { TYPES } from '@src/types'
 import { ApplicationPullRequestFile } from '@src/application/services/pull-request.types'
+import { epochToZulu, zuluToEpoch } from '@filecoin-plus/core'
 
 export class EditApplicationCommand extends Command {
   public readonly applicationId: string
@@ -51,9 +52,9 @@ export class EditApplicationCommandHandler implements ICommandHandler<EditApplic
       return prevApplicationInstructions
     }
     // Ensure instruction arrays length >= previous instruction arrays length
-    if (currApplicationInstructions.length < prevApplicationInstructions.length) {
-      return prevApplicationInstructions
-    }
+    //if (currApplicationInstructions.length < prevApplicationInstructions.length) {
+    //  return prevApplicationInstructions
+    //}
     // Ensure each method and amount is valid
     const validMethods = [ApplicationAllocator.META_ALLOCATOR, ApplicationAllocator.RKH_ALLOCATOR];
     for (let currApplicationInstruction of currApplicationInstructions) {
@@ -68,6 +69,7 @@ export class EditApplicationCommandHandler implements ICommandHandler<EditApplic
       if (!validMethods.includes(currInstructionMethod as ApplicationAllocator)) {
         return prevApplicationInstructions
       }
+      // Note negative not allowed, cannot use this path for subtraction/balance setting
       if (!Number.isInteger(currInstructionAmount) || currInstructionAmount <= 0) {
         return prevApplicationInstructions
       }
@@ -86,10 +88,15 @@ export class EditApplicationCommandHandler implements ICommandHandler<EditApplic
     }
 
     const prevApplicationInstructions = application.applicationInstructions
-    const currApplicationInstructions = Object.entries(command.file.audit_outcomes).map(([_, value]) => ({
-      method: ApplicationAllocator.META_ALLOCATOR,
-      timestamp: parseInt(value[0]),
-      datacap_amount: parseInt(value[1]),
+
+    // FIXME ? the original code ALWAYS forced it to META_ALLOCATOR but I think that was wrong (?)
+    const currApplicationInstructions =  command.file.audits.map((ao) => ({
+      method: command.file.metapathway_type === "MA" ? ApplicationAllocator.META_ALLOCATOR : ApplicationAllocator.RKH_ALLOCATOR,
+      startTimestamp: zuluToEpoch(ao.started),
+      endTimestamp: zuluToEpoch(ao.ended),
+      allocatedTimestamp: zuluToEpoch(ao.dc_allocated),
+      status: ao.outcome || "PENDING",
+      datacap_amount: ao.datacap_amount || 0
     }))
     console.log('prevApplicationInstructions', prevApplicationInstructions)
     console.log('currApplicationInstructions', currApplicationInstructions)
