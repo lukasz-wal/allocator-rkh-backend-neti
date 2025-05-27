@@ -61,7 +61,7 @@ export async function submitRefreshRKHAllocatorCommand(
     logger: Logger,
 ) {
     if (applicationDetails.status !== 'DC_ALLOCATED') {
-        logger.debug(`Application status must be 'APPROVED'.`)
+        logger.debug(`Application status must be 'DC_ALLOCATED'.`)
         return
     }
     const actorId = applicationDetails.actorId
