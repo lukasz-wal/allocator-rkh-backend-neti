@@ -290,7 +290,7 @@ export class MetaAllocatorApprovalCompletedEventHandler implements IEventHandler
       { id: event.aggregateId },
       {
         $set: {
-          status: ApplicationStatus.APPROVED,
+          status: ApplicationStatus.DC_ALLOCATED,
           applicationInstructions: event.applicationInstructions,
           metaAllocator: {
             blockNumber: event.blockNumber,
@@ -359,7 +359,7 @@ export class RKHApprovalCompletedEventHandler implements IEventHandler<RKHApprov
       { id: event.aggregateId },
       {
         $set: {
-          status: ApplicationStatus.APPROVED,
+          status: ApplicationStatus.DC_ALLOCATED,
           applicationInstructions: event.applicationInstructions,
         },
       },
@@ -381,7 +381,7 @@ export class DatacapAllocationUpdatedEventHandler implements IEventHandler<Datac
 
     await this._repository.update({
       id: event.aggregateId,
-      status: ApplicationStatus.APPROVED,
+      status: ApplicationStatus.DC_ALLOCATED,
       datacap: event.datacap,
     })
   }
