@@ -18,7 +18,7 @@ export type ApplicationPullRequestFile = {
   name: string
   allocator_id: string
   organization: string
-  allocation_bookkeeping: string,
+  //allocation_bookkeeping: string,
   metapathway_type: string|undefined
   ma_address: string|undefined
   associated_org_addresses: string
@@ -114,7 +114,7 @@ export async function mapApplicationToPullRequestFile(application: DatacapAlloca
     name: application.applicantName,
     allocator_id: allocatorId,
     organization: application.applicantOrgName,
-    allocation_bookkeeping: application.allocationBookkeepingRepo,
+    //allocation_bookkeeping: application.allocationBookkeepingRepo,
     metapathway_type: application.pathway,
     ma_address: application.ma_address,
     pathway_addresses: {
