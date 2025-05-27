@@ -13,6 +13,8 @@ export function epochToZulu(epoch: number): string {
     console.log(`Error in epochToZulu: Invalid timestamp: "${epoch}"`);
     return "1970-01-01T00:00:01Z";
   }
+  // Epoch time is second resolution so kill the ms
+  d.setUTCMilliseconds(0)
   return d.toISOString();
 }
 
