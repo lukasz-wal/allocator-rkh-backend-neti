@@ -32,11 +32,11 @@ export type GovernanceReviewApprovedData = {
   finalDataCap: number
   allocatorType: AllocatorType
   reviewerAddress: string
-  isMDMAAllocator: boolean
+  isMDMAAllocator?: boolean
 }
 
 export type GovernanceReviewRejectedData = {
   reason: string
   reviewerAddress: string
-  isMDMAAllocator: boolean
+  isMDMAAllocator?: boolean
 }
