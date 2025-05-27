@@ -68,10 +68,14 @@ export class CreateApplicationCommandHandler implements ICommandHandler<CreateAp
     
   async handle(command: CreateApplicationCommand): Promise<Result<{ guid: string }>> {
     console.log('command', command)
+    let existing: DatacapAllocator | null = null
     try {
+      // Check if the application already exists in the database: this may be a restart
+      // of the application, so we need to ensure that we don't create a duplicate entry.
       this.logger.debug(`Getting repository entry for ${command.applicationId}...`)
-      await this.repository.getById(command.applicationId)
-      this.logger.debug(`Getting repository entry for ${command.applicationId} succeeded! Aborting...`)
+      const existing = await this.repository.getById(command.applicationId)
+      this.logger.debug(`Getting repository entry for ${command.applicationId} succeeded. Aborting...`)
+      console.log(existing)
       return {
         success: false,
         error: new Error('Application already exists'),

@@ -9,6 +9,7 @@ export class UpdateRKHApprovalsCommand extends Command {
     public readonly allocatorId: string,
     public readonly messageId: number,
     public readonly approvals: string[],
+    public readonly status: "Pending" | "Approved" | "Rejected",
   ) {
     super()
   }
@@ -35,10 +36,9 @@ export class UpdateRKHApprovalsCommandHandler implements ICommandHandler<UpdateR
       return
     }
 
-    allocator.updateRKHApprovals(command.messageId, command.approvals)
-
-    // Check if the approval threshold is met
-    if (command.approvals.length >= allocator.rkhApprovalThreshold) {
+    if (command.status === "Pending") {
+      allocator.updateRKHApprovals(command.messageId, command.approvals)
+    } else if (command.status === "Approved") {
       allocator.completeRKHApproval()
     }
 

@@ -14,11 +14,20 @@ type PendingTx = {
   approved: string[]
 }
 
+type ApprovedTx = {
+  cid: string
+  to: string
+  from: string
+  timestamp: number
+  params: string
+}
+
 type Multisig = {
   address: string
   threshold: number
   signers: string[]
   pendingTxs: PendingTx[]
+  approvedTxs: ApprovedTx[]
 }
 
 export interface ILotusClient {
@@ -74,7 +83,31 @@ export class LotusClient implements ILotusClient {
     )
 
     const pendingTxs = await this.request('Filecoin.MsigGetPending', [id, null])
+    this.logger.debug(`Found ${pendingTxs.length} pending transactions for multisig ${id}`)
+    console.log("pendingTxs", pendingTxs)
 
+    // NOTE: to get the approved transactions we should be able to use Filecoin.StateListMessages
+    // method and filter it but our Lotus node provider doesn't support it, so use Filfox instead.
+    //
+    //const approvedTxs = await this.request('Filecoin.StateListMessages', [{"To": id}, [], null])
+    
+    // TODO should cache the most recent time we checked rather than always fetching the last 50
+    const filfoxResult = await axios.get(`https://filfox.info/api/v1/address/${id}/messages?pageSize=50&page=0`)
+    this.logger.debug(`Found ${filfoxResult?.data?.messages?.length} recent transactions for multisig ${id}`)
+    console.log("recentTxs", filfoxResult?.data?.messages)
+
+    let recentApprovedTxs = [] as any[]
+
+    // Expect Filfox to not always be available, so quietly ignore errors on this go-around
+    if(filfoxResult?.data?.messages) {
+      for (const tx of filfoxResult.data.messages) {
+        if (tx.to === id && tx.method === 'Approve') {
+          this.logger.debug(`Found approved transaction: ${JSON.stringify(tx)}`)
+          recentApprovedTxs.push(tx)          
+        }
+      }
+    }
+    
     const multisig = {
       address: id,
       threshold: multisigState.State.NumApprovalsThreshold,
@@ -87,8 +120,15 @@ export class LotusClient implements ILotusClient {
         value: tx.Value,
         approved: tx.Approved,
       })),
+      approvedTxs: recentApprovedTxs.map((tx: any) => ({
+        cid: tx.cid,
+        to: tx.to,
+        from: tx.from,
+        timestamp: tx.timestamp,
+        params: tx.params,
+      })),
     }
-    this.logger.debug(`Multisig ${id}: ${JSON.stringify(multisig)}`)
+    this.logger.debug(`Returning Multisig state for ${id}: ${JSON.stringify(multisig)}`)
 
     return multisig
   }

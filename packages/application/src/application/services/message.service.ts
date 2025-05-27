@@ -38,7 +38,7 @@ export class MessageService {
       [ApplicationStatus.GOVERNANCE_REVIEW_PHASE]: 'Governance Review Phase',
       [ApplicationStatus.RKH_APPROVAL_PHASE]: 'RKH Approval Phase',
       [ApplicationStatus.META_APPROVAL_PHASE]: 'Meta Allocator Approval Phase',
-      [ApplicationStatus.APPROVED]: 'Approved',
+      [ApplicationStatus.DC_ALLOCATED]: 'Approved&Allocated',
       [ApplicationStatus.REJECTED]: 'Rejected',
     }
     
@@ -47,7 +47,7 @@ export class MessageService {
       [ApplicationStatus.GOVERNANCE_REVIEW_PHASE]: '👥',
       [ApplicationStatus.RKH_APPROVAL_PHASE]: '🔑',
       [ApplicationStatus.META_APPROVAL_PHASE]: '🔑',
-      [ApplicationStatus.APPROVED]: '✅',
+      [ApplicationStatus.DC_ALLOCATED]: '✅',
       [ApplicationStatus.REJECTED]: '❌',
     }
 
@@ -76,7 +76,7 @@ export class MessageService {
         return this.getRKHApprovalStatusMessage(application)
       case ApplicationStatus.META_APPROVAL_PHASE:
         return this.getMetaApprovalStatusMessage(application)
-      case ApplicationStatus.APPROVED:
+      case ApplicationStatus.DC_ALLOCATED:
         return this.getApprovedStatusMessage(application)
       case ApplicationStatus.REJECTED:
         return this.getRejectedStatusMessage(application)
@@ -139,11 +139,12 @@ The governance team will review your comments and make any necessary adjustments
 
   private getApprovedStatusMessage(application: DatacapAllocator): string {
     return `
-### Application Approved
-- Congratulations! Your application to become a DataCap allocator has been approved
-- You will receive further instructions shortly
+### Action Completed
+- Congratulations! Your application has been approved and executed
+- You should have received  ${application.applicationInstructions[application.applicationInstructions.length - 1].datacap_amount} PiBs of DataCap on the wallet you specified:  ${application.allocatorMultisigAddress} 
+- Please let us know if you have any further questions
 
-🎉 Welcome to the Filecoin Plus community!
+🎉 Thank you for being part of the Filecoin Plus community!
 `
   }
 
