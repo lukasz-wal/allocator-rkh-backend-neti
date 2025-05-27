@@ -427,7 +427,7 @@ export class DatacapAllocator extends AggregateRoot {
     this.applicantOrgName = event.applicantOrgName
     this.applicantOrgAddresses = event.applicantOrgAddresses
     this.applicantGithubHandle = event.applicantGithubHandle
-
+    this.allocationBookkeepingRepo = event.bookkeepingRepo
     this.allocationTrancheSchedule = event.allocationTrancheSchedule
     this.allocationAudit = event.audit
     this.allocationDistributionRequired = event.distributionRequired
@@ -489,10 +489,9 @@ export class DatacapAllocator extends AggregateRoot {
       event.file.application.github_handles && event.file.application.github_handles.length > 0
         ? event.file.application.github_handles[0]
         : this.applicantGithubHandle
-    this.allocationBookkeepingRepo = event.file.application.allocation_bookkeeping || this.allocationBookkeepingRepo
     this.onChainAddressForDataCapAllocation =
       event.file.application.client_contract_address || this.onChainAddressForDataCapAllocation
-
+    this.allocationBookkeepingRepo = event.file.application.allocation_bookkeeping || this.allocationBookkeepingRepo
     this.allocatorMultisigAddress = event.file.pathway_addresses?.msig || this.allocatorMultisigAddress
     this.allocatorMultisigSigners = event.file.pathway_addresses?.signers || this.allocatorMultisigSigners
 
