@@ -60,7 +60,7 @@ export async function submitRefreshRKHAllocatorCommand(
     commandBus: ICommandBus,
     logger: Logger,
 ) {
-    if (applicationDetails.status !== 'APPROVED') {
+    if (applicationDetails.status !== 'DC_ALLOCATED') {
         logger.debug(`Application status must be 'APPROVED'.`)
         return
     }

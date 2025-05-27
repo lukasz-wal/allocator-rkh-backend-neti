@@ -39,7 +39,7 @@ export async function subscribeMetaAllocatorAllowances(container: Container) {
     logger.info('Subscribing to Meta Allocator allowances...')
     setInterval(async () => {
         try {
-            const approvedAllocators = await repository.getPaginated(1, 1000, [ApplicationStatus.APPROVED])
+            const approvedAllocators = await repository.getPaginated(1, 1000, [ApplicationStatus.DC_ALLOCATED])
             const allocators = approvedAllocators.results.filter(a => a.applicationInstructions && a.applicationInstructions[a.applicationInstructions.length - 1].method === 'META_ALLOCATOR')
             console.log("Found", allocators.length, "allocators")
 

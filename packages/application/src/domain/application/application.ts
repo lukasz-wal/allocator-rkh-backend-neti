@@ -92,6 +92,7 @@ export type ApplicationGrantCycle = {
 }
 export type StatusEvent = { stage: string; timestamp: number }
 
+
 export class DatacapAllocator extends AggregateRoot {
   public applicationNumber: number
   public applicationPullRequest: ApplicationPullRequest
@@ -141,6 +142,11 @@ export class DatacapAllocator extends AggregateRoot {
   public allocationDatacapAllocationLimits: string
   public onChainAddressForDataCapAllocation: string
 
+  public mdma_address = 'f410fw325e6novwl57jcsbhz6koljylxuhqq5jnp5ftq'
+  public rkh_address = 'f080'
+  public isMetaAllocator: boolean
+  public isMDMA: boolean | undefined
+
   public status: { [key: string]: number | null } = {
     'Application Submitted': null,
     'KYC Submitted': null,
@@ -148,7 +154,7 @@ export class DatacapAllocator extends AggregateRoot {
     Declined: null,
     'DC Allocated': null,
   }
-
+  
   /*public status: { [stage: string]: number[]|null} = {
     "Application Submitted": null,
     "KYC Submitted":         null,
@@ -210,7 +216,7 @@ export class DatacapAllocator extends AggregateRoot {
   }
 
   edit(file: ApplicationPullRequestFile) {
-    this.ensureValidApplicationStatus([ApplicationStatus.KYC_PHASE, ApplicationStatus.GOVERNANCE_REVIEW_PHASE])
+    //this.ensureValidApplicationStatus([ApplicationStatus.KYC_PHASE, ApplicationStatus.GOVERNANCE_REVIEW_PHASE])
     console.log('edit')
     this.applyChange(new ApplicationEdited(this.guid, file))
   }
@@ -247,7 +253,7 @@ export class DatacapAllocator extends AggregateRoot {
         ),
       )
     } else {
-      this.ensureValidApplicationStatus([ApplicationStatus.APPROVED])
+      this.ensureValidApplicationStatus([ApplicationStatus.DC_ALLOCATED])
       this.applyChange(
         new ApplicationPullRequestUpdated(
           this.guid,
@@ -306,19 +312,32 @@ export class DatacapAllocator extends AggregateRoot {
 
     this.applyChange(new GovernanceReviewApproved(this.guid, this.applicationInstructions))
 
-    const isMetaAllocator =
-      this.applicationInstructions[lastInstructionIndex].method === ApplicationAllocator.META_ALLOCATOR
-    const isMDMA = details?.isMDMAAllocator
+    this.isMetaAllocator = this.applicationInstructions[lastInstructionIndex].method === ApplicationAllocator.META_ALLOCATOR
+    this.isMDMA = details?.isMDMAAllocator
 
     const action = () => {
-      if (isMetaAllocator && isMDMA)
+      if (this.isMetaAllocator && this.isMDMA){
+        this.allocationTooling = ['smart_contract_allocator']
+        this.pathway = 'MDMA'
+        this.ma_address = this.mdma_address
+        this.applicationStatus = ApplicationStatus.DC_ALLOCATED
+        console.log('apply gov review MDMA', this)
         return new MetaAllocatorApprovalCompleted(this.guid, 0, '', this.applicationInstructions)
-      if (isMetaAllocator && !isMDMA) return new MetaAllocatorApprovalStarted(this.guid)
-      if (!isMetaAllocator && isMDMA) return new RKHApprovalCompleted(this.guid, this.applicationInstructions)
+      }
+      if (this.isMetaAllocator && !this.isMDMA) return new MetaAllocatorApprovalStarted(this.guid)
+      if (!this.isMetaAllocator && this.isMDMA){
+        this.allocationTooling = []
+        this.pathway = 'RKH'
+        this.ma_address = this.rkh_address
+        this.applicationStatus = ApplicationStatus.DC_ALLOCATED
+         console.log('apply gov review RKH', this)
+        return new RKHApprovalCompleted(this.guid, this.applicationInstructions)
+      }
       return new RKHApprovalStarted(this.guid, 2) // TODO: Hardcoded 2 for multisig threshold
     }
 
     this.applyChange(action())
+    console.log('apply gov review none', this)
   }
 
   rejectGovernanceReview(details: GovernanceReviewRejectedData) {
@@ -416,13 +435,18 @@ export class DatacapAllocator extends AggregateRoot {
     this.applicantOrgName = event.applicantOrgName
     this.applicantOrgAddresses = event.applicantOrgAddresses
     this.applicantGithubHandle = event.applicantGithubHandle
+    
+    this.allocationTooling = this.allocationTooling
+    this.pathway = this.pathway
+    this.ma_address = this.ma_address
+    this.mdma_address = this.mdma_address
+    this.isMDMA = this.isMDMA
 
     this.allocationTrancheSchedule = event.allocationTrancheSchedule
     this.allocationAudit = event.audit
     this.allocationDistributionRequired = event.distributionRequired
     this.allocationRequiredStorageProviders = event.allocationRequiredStorageProviders
     this.allocationRequiredReplicas = event.allocationRequiredReplicas
-    this.allocationTooling = []
     this.allocationDatacapAllocationLimits = event.datacapAllocationLimits
     this.onChainAddressForDataCapAllocation = event.onChainAddressForDataCapAllocation
     if(!this.applicationStatus){
@@ -448,16 +472,21 @@ export class DatacapAllocator extends AggregateRoot {
 
     this.applicantOrgName = event.file.organization || this.applicantOrgName
 
-    if (this.applicationStatus === ApplicationStatus.META_APPROVAL_PHASE) {
+    if (this.applicationStatus === ApplicationStatus.META_APPROVAL_PHASE || (this.isMetaAllocator&&this.isMDMA)) {
       this.allocationTooling = ['smart_contract_allocator']
-      this.pathway = 'MA'
-      this.ma_address = 'f410fw325e6novwl57jcsbhz6koljylxuhqq5jnp5ftq'
+      this.pathway = 'MDMA'
+      this.ma_address = this.mdma_address
     }
-    if (this.applicationStatus === ApplicationStatus.RKH_APPROVAL_PHASE) {
+    if (this.applicationStatus === ApplicationStatus.RKH_APPROVAL_PHASE || (!this.isMetaAllocator && this.isMDMA)) {
       this.allocationTooling = []
       this.pathway = 'RKH'
-      this.ma_address = 'f080'
+      this.ma_address = this.rkh_address
     }
+    this.allocationTooling = this.allocationTooling
+    this.pathway = this.pathway
+    this.ma_address = this.ma_address
+    this.mdma_address = this.mdma_address
+    this.isMDMA = this.isMDMA
     this.applicantOrgAddresses = event.file.associated_org_addresses || this.applicantOrgAddresses
     this.allocationStandardizedAllocations =
       event.file.application.allocations || this.allocationStandardizedAllocations
@@ -569,7 +598,7 @@ export class DatacapAllocator extends AggregateRoot {
     this.applicationStatus = ApplicationStatus.RKH_APPROVAL_PHASE
     this.allocationTooling = []
     this.pathway = 'RKH'
-    this.ma_address = 'f080'
+    this.ma_address = this.rkh_address
     this.rkhApprovalThreshold = event.approvalThreshold
   }
 
@@ -578,17 +607,19 @@ export class DatacapAllocator extends AggregateRoot {
     this.applicationStatus =
       event.approvals.length < event.approvalThreshold
         ? ApplicationStatus.RKH_APPROVAL_PHASE
-        : ApplicationStatus.APPROVED
+        : ApplicationStatus.DC_ALLOCATED
 
     this.rkhApprovals = event.approvals
     this.rkhApprovalThreshold = event.approvalThreshold
   }
 
   applyRKHApprovalCompleted(event: RKHApprovalCompleted) {
-    if (this.applicationStatus === ApplicationStatus.RKH_APPROVAL_PHASE) {
-      this.status['DC Allocated'] ??= event.timestamp.getTime()
-    }
+    this.ensureValidApplicationStatus([ApplicationStatus.GOVERNANCE_REVIEW_PHASE,ApplicationStatus.RKH_APPROVAL_PHASE, ApplicationStatus.DC_ALLOCATED])
+    this.status['DC Allocated'] ??= event.timestamp.getTime()
     this.applicationStatus = ApplicationStatus.DC_ALLOCATED
+    this.allocationTooling = []
+    this.pathway = 'RKH'
+    this.ma_address = this.rkh_address
     const index = this.applicationInstructions.length - 1
     this.applicationInstructions[index].allocatedTimestamp = event.timestamp.getTime()
     this.applicationInstructions[index].status = ApplicationInstructionStatus.GRANTED
@@ -598,16 +629,18 @@ export class DatacapAllocator extends AggregateRoot {
   applyMetaAllocatorApprovalStarted(event: MetaAllocatorApprovalStarted) {
     this.applicationStatus = ApplicationStatus.META_APPROVAL_PHASE
     this.allocationTooling = ['smart_contract_allocator']
-    this.pathway = 'MA'
-    this.ma_address = '0xB6F5d279AEad97dFA45209F3E53969c2EF43C21d'
+    this.pathway = 'MDMA'
+    this.ma_address = this.mdma_address
   }
 
   applyMetaAllocatorApprovalCompleted(event: MetaAllocatorApprovalCompleted) {
-    if (this.applicationStatus === ApplicationStatus.META_APPROVAL_PHASE) {
-      this.status['DC Allocated'] ??= event.timestamp.getTime()
-    }
+    this.ensureValidApplicationStatus([ApplicationStatus.GOVERNANCE_REVIEW_PHASE,ApplicationStatus.META_APPROVAL_PHASE, ApplicationStatus.DC_ALLOCATED])
+    this.status['DC Allocated'] ??= event.timestamp.getTime()
     this.applicationStatus = ApplicationStatus.DC_ALLOCATED
-
+  
+    this.allocationTooling = ['smart_contract_allocator']
+    this.pathway = 'MDMA'
+    this.ma_address = this.mdma_address
     const index = this.applicationInstructions.length - 1
     this.applicationInstructions[index].allocatedTimestamp = event.timestamp.getTime()
     this.applicationInstructions[index].status = ApplicationInstructionStatus.GRANTED
@@ -615,7 +648,7 @@ export class DatacapAllocator extends AggregateRoot {
   }
 
   applyDatacapAllocationUpdated(event: DatacapAllocationUpdated) {
-    this.applicationStatus = ApplicationStatus.APPROVED
+    this.applicationStatus = ApplicationStatus.DC_ALLOCATED
     this.datacapAmount = event.datacap
   }
 
